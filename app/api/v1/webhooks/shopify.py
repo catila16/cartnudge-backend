@@ -48,6 +48,10 @@ async def shopify_checkout_update(request: Request, background_tasks: Background
         if not customer_phone and checkout.get("customer"):
             customer_phone = checkout.get("customer", {}).get("phone")
             
+        # Fallback to test number for sanity testing if Shopify omits it from checkout
+        if not customer_phone:
+            customer_phone = "+905345900476"
+            
         # We delegate the delay logic to Celery
         print(f"Checkout update received: {checkout_token}. Scheduling recovery...")
         schedule_cart_recovery(

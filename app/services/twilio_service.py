@@ -13,6 +13,10 @@ def send_whatsapp_message(to_number: str, message: str) -> bool:
     Sends a WhatsApp message using Twilio API.
     If credentials are not configured, it simulates the sending via logs.
     """
+    if not to_number:
+        print("Error: Cannot send WhatsApp message because phone number is missing.")
+        return False
+
     # Format the number for WhatsApp if not already formatted
     if not to_number.startswith("whatsapp:"):
         to_number = f"whatsapp:{to_number}"
