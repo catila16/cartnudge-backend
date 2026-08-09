@@ -6,8 +6,8 @@ from datetime import datetime, timedelta
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 celery_app = Celery("cartnudge_workers", broker=REDIS_URL, backend=REDIS_URL)
 
-# For local Windows development where Redis might not be running:
-celery_app.conf.task_always_eager = True
+# For production, Celery uses Redis.
+# celery_app.conf.task_always_eager = False
 
 @celery_app.task
 def trigger_first_contact(conversation_id: str, customer_phone: str = "+905551234567"):
