@@ -3,7 +3,7 @@ from twilio.rest import Client
 
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
-TWILIO_FROM_NUMBER = os.getenv("TWILIO_FROM_NUMBER", "whatsapp:+14155238886") # Default Twilio Sandbox Number
+TWILIO_FROM_NUMBER = os.getenv("TWILIO_WHATSAPP_NUMBER", os.getenv("TWILIO_FROM_NUMBER", "whatsapp:+14155238886")) # Default Twilio Sandbox Number
 
 # Initialize client only if credentials are provided
 client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN) if TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN else None
