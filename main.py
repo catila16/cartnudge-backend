@@ -13,7 +13,13 @@ app.include_router(live_support.router, prefix="/api/v1/live-support", tags=["Li
 
 @app.on_event("startup")
 async def on_startup():
-    print("Starting up CartNudge Backend...")
+    from app.core.database import DATABASE_URL
+    import urllib.parse
+    
+    parsed = urllib.parse.urlparse(DATABASE_URL)
+    safe_url = f"{parsed.scheme}://{parsed.username}:***@{parsed.hostname}:{parsed.port}{parsed.path}"
+    print(f"Starting up CartNudge Backend... Connecting to {safe_url}")
+    
     # Initialize DB tables for testing (in production use Alembic)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

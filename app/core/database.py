@@ -3,7 +3,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-raw_url = os.getenv("DATABASE_URL", "sqlite:///./cartnudge.db")
+raw_url = os.getenv("DATABASE_URL", "sqlite:///./cartnudge.db").strip('"').strip("'")
 
 # Ensure proper driver for async and sync engines
 if raw_url.startswith("postgres://") or raw_url.startswith("postgresql://"):
