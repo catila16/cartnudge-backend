@@ -74,9 +74,10 @@ def schedule_cart_recovery(conversation_id: str, store_settings: dict = None, cu
     if store_settings is None:
         store_settings = {}
         
-    delay_minutes = store_settings.get("cartAbandonmentDelay", 60)
+    # TEMPORARY TEST OVERRIDES
+    delay_minutes = 1 # store_settings.get("cartAbandonmentDelay", 60)
     followup_hours = store_settings.get("cartFollowupHours", 24)
-    quiet_enabled = store_settings.get("quietHoursEnabled", False)
+    quiet_enabled = False # store_settings.get("quietHoursEnabled", False)
     quiet_start = store_settings.get("quietHoursStart", "22:00")
     quiet_end = store_settings.get("quietHoursEnd", "08:00")
     
