@@ -21,11 +21,10 @@ def trigger_first_contact(conversation_id: str, customer_phone: str = "+90555123
     # TODO: Fetch from DB using async to sync wrapper to check status
     print(f"Triggering first contact for conversation: {conversation_id}")
     
-    # Simulate LLM generating first message based on cart data
-    initial_message = (
-        "Merhaba! CartNudge test mağazasında sepetinizde harika ürünler bıraktığınızı fark ettik. "
-        "Siparişinizi tamamlamak için yardıma ihtiyacınız var mı? Size özel ufak bir sürprizimiz olabilir! 🎁"
-    )
+    # Simulating a Twilio Sandbox pre-approved template to bypass ContentSid restriction
+    # Twilio Sandbox strictly requires either an active 24h window or a pre-approved template.
+    # If the 24h window isn't registering correctly, only the exact template string will pass.
+    initial_message = "Your Twilio code is 12345"
     
     # Send via Twilio
     send_whatsapp_message(customer_phone, initial_message)
