@@ -3,9 +3,20 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-# Database URL from environment, fallback to sqlite for dev
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./cartnudge.db")
-SYNC_DATABASE_URL = os.getenv("SYNC_DATABASE_URL", "sqlite:///./cartnudge.db")
+raw_url = os.getenv("DATABASE_URL", "sqlite:///./cartnudge.db")
+
+# Ensure proper driver for async and sync engines
+if raw_url.startswith("postgres://") or raw_url.startswith("postgresql://"):
+    # Fix standard postgres URL for asyncpg
+    DATABASE_URL = raw_url.replace("postgres://", "postgresql+asyncpg://").replace("postgresql://", "postgresql+asyncpg://")
+    SYNC_DATABASE_URL = raw_url.replace("postgres://", "postgresql://")
+    
+    # Also fix common user typos like ":port/"
+    DATABASE_URL = DATABASE_URL.replace(":port/", ":5432/")
+    SYNC_DATABASE_URL = SYNC_DATABASE_URL.replace(":port/", ":5432/")
+else:
+    DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./cartnudge.db")
+    SYNC_DATABASE_URL = os.getenv("SYNC_DATABASE_URL", "sqlite:///./cartnudge.db")
 
 engine = create_async_engine(DATABASE_URL, echo=False)
 AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
