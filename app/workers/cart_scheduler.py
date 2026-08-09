@@ -67,7 +67,7 @@ def apply_quiet_hours(target_time: datetime, start_str: str, end_str: str) -> tu
         
     return target_time, False
 
-def schedule_cart_recovery(conversation_id: str, store_settings: dict = None):
+def schedule_cart_recovery(conversation_id: str, store_settings: dict = None, customer_phone: str = None):
     """
     Shopify'dan checkouts/update geldiğinde bu foksiyon çağrılır.
     """
@@ -105,7 +105,7 @@ def schedule_cart_recovery(conversation_id: str, store_settings: dict = None):
 
     # Schedule first contact
     trigger_first_contact.apply_async(
-        args=[conversation_id], 
+        args=[conversation_id, customer_phone], 
         countdown=countdown_1
     )
     

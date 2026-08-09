@@ -41,8 +41,19 @@ async def shopify_checkout_update(request: Request, background_tasks: Background
             
         _scheduled_checkouts[checkout_token] = True
         
+        # Extract customer phone from checkout payload
+        customer_phone = checkout.get("phone")
+        if not customer_phone and checkout.get("shipping_address"):
+            customer_phone = checkout.get("shipping_address", {}).get("phone")
+        if not customer_phone and checkout.get("customer"):
+            customer_phone = checkout.get("customer", {}).get("phone")
+            
         # We delegate the delay logic to Celery
         print(f"Checkout update received: {checkout_token}. Scheduling recovery...")
-        schedule_cart_recovery(conversation_id=checkout_token, store_settings=store_settings)
+        schedule_cart_recovery(
+            conversation_id=checkout_token, 
+            store_settings=store_settings,
+            customer_phone=customer_phone
+        )
         
     return {"status": "ok"}
