@@ -14,6 +14,12 @@ if raw_url.startswith("postgres://") or raw_url.startswith("postgresql://"):
     # Also fix common user typos like ":port/"
     DATABASE_URL = DATABASE_URL.replace(":port/", ":5432/")
     SYNC_DATABASE_URL = SYNC_DATABASE_URL.replace(":port/", ":5432/")
+    
+    # Strip ?schema=public which Prisma uses but asyncpg rejects
+    if "?" in DATABASE_URL:
+        DATABASE_URL = DATABASE_URL.split("?")[0]
+    if "?" in SYNC_DATABASE_URL:
+        SYNC_DATABASE_URL = SYNC_DATABASE_URL.split("?")[0]
 else:
     DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./cartnudge.db")
     SYNC_DATABASE_URL = os.getenv("SYNC_DATABASE_URL", "sqlite:///./cartnudge.db")
