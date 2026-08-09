@@ -52,12 +52,16 @@ async def shopify_checkout_update(request: Request, background_tasks: Background
         if not customer_phone:
             customer_phone = "+905345900476"
             
+        # Extract line items for OpenAI personalization
+        line_items = checkout.get("line_items", [])
+            
         # We delegate the delay logic to Celery
         print(f"Checkout update received: {checkout_token}. Scheduling recovery...")
         schedule_cart_recovery(
             conversation_id=checkout_token, 
             store_settings=store_settings,
-            customer_phone=customer_phone
+            customer_phone=customer_phone,
+            line_items=line_items
         )
         
     return {"status": "ok"}

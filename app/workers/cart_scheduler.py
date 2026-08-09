@@ -10,21 +10,23 @@ celery_app = Celery("cartnudge_workers", broker=REDIS_URL, backend=REDIS_URL)
 # celery_app.conf.task_always_eager = False
 
 @celery_app.task
-def trigger_first_contact(conversation_id: str, customer_phone: str = "+905551234567"):
+def trigger_first_contact(conversation_id: str, customer_phone: str = "+905551234567", line_items: list = None):
     """
     1. Saat dolduğunda tetiklenir.
     Veritabanından conversation_id bulunur, hala SCHEDULED veya PENDING ise
     ilk WhatsApp mesajı atılır.
     """
     from app.services.twilio_service import send_whatsapp_message
+    from app.services.openai_service import generate_cart_recovery_message
     
     # TODO: Fetch from DB using async to sync wrapper to check status
     print(f"Triggering first contact for conversation: {conversation_id}")
     
-    # Simulating a Twilio Sandbox pre-approved template to bypass ContentSid restriction
-    # Twilio Sandbox strictly requires either an active 24h window or a pre-approved template.
-    # If the 24h window isn't registering correctly, only the exact template string will pass.
-    initial_message = "Your Twilio code is 12345"
+    # Generate message using OpenAI based on cart items
+    initial_message = generate_cart_recovery_message(line_items)
+    print("\n" + "="*50)
+    print(f"[AI GENERATED MESSAGE]\n{initial_message}")
+    print("="*50 + "\n")
     
     # Send via Twilio
     send_whatsapp_message(customer_phone, initial_message)
@@ -66,7 +68,7 @@ def apply_quiet_hours(target_time: datetime, start_str: str, end_str: str) -> tu
         
     return target_time, False
 
-def schedule_cart_recovery(conversation_id: str, store_settings: dict = None, customer_phone: str = None):
+def schedule_cart_recovery(conversation_id: str, store_settings: dict = None, customer_phone: str = None, line_items: list = None):
     """
     Shopify'dan checkouts/update geldiğinde bu foksiyon çağrılır.
     """
@@ -105,7 +107,7 @@ def schedule_cart_recovery(conversation_id: str, store_settings: dict = None, cu
 
     # Schedule first contact
     trigger_first_contact.apply_async(
-        args=[conversation_id, customer_phone], 
+        args=[conversation_id, customer_phone, line_items], 
         countdown=countdown_1
     )
     
