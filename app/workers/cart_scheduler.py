@@ -42,6 +42,8 @@ def trigger_followup_contact(conversation_id: str):
     print(f"Triggering 24h follow-up for conversation: {conversation_id}")
     return True
 
+import zoneinfo
+
 def apply_quiet_hours(target_time: datetime, start_str: str, end_str: str) -> tuple[datetime, bool]:
     start_time = datetime.strptime(start_str, "%H:%M").time()
     end_time = datetime.strptime(end_str, "%H:%M").time()
@@ -58,7 +60,7 @@ def apply_quiet_hours(target_time: datetime, start_str: str, end_str: str) -> tu
             is_quiet = True
             
     if is_quiet:
-        shifted_time = datetime.combine(target_time.date(), end_time) + timedelta(minutes=1)
+        shifted_time = datetime.combine(target_time.date(), end_time, tzinfo=target_time.tzinfo) + timedelta(minutes=1)
         if overnight and tt_time >= start_time:
             shifted_time += timedelta(days=1)
         return shifted_time, True
@@ -78,20 +80,28 @@ def schedule_cart_recovery(conversation_id: str, store_settings: dict = None):
     quiet_start = store_settings.get("quietHoursStart", "22:00")
     quiet_end = store_settings.get("quietHoursEnd", "08:00")
     
-    now = datetime.now()
-    original_target_1 = now + timedelta(minutes=delay_minutes)
+    tz_name = store_settings.get("timezone", "UTC")
+    try:
+        tz = zoneinfo.ZoneInfo(tz_name)
+    except Exception:
+        tz = zoneinfo.ZoneInfo("UTC")
+
+    now_utc = datetime.now(zoneinfo.ZoneInfo("UTC"))
+    now_local = now_utc.astimezone(tz)
+    
+    original_target_1 = now_local + timedelta(minutes=delay_minutes)
     
     final_target_1, shifted_1 = original_target_1, False
     if quiet_enabled:
         final_target_1, shifted_1 = apply_quiet_hours(original_target_1, quiet_start, quiet_end)
     
-    countdown_1 = int((final_target_1 - now).total_seconds())
+    countdown_1 = int((final_target_1 - now_local).total_seconds())
     if countdown_1 < 0: countdown_1 = 0
     
     if shifted_1:
-        print(f"[SCHEDULER] Original: {original_target_1.strftime('%H:%M')} -> Shifted: {final_target_1.strftime('%b %d, %H:%M')} | Reason: Quiet Hours")
+        print(f"[SCHEDULER] Original: {original_target_1.strftime('%H:%M')} -> Shifted: {final_target_1.strftime('%b %d, %H:%M')} ({tz_name}) | Reason: Quiet Hours")
     else:
-        print(f"[SCHEDULER] Cart recovery task scheduled for {final_target_1.strftime('%H:%M')} (Quiet hours shift applied: {shifted_1})")
+        print(f"[SCHEDULER] Cart recovery task scheduled for {final_target_1.strftime('%H:%M')} ({tz_name})")
 
     # Schedule first contact
     trigger_first_contact.apply_async(
