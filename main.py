@@ -43,6 +43,12 @@ async def on_startup():
     # Initialize DB tables for testing (in production use Alembic)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Quick migration for new columns
+        from sqlalchemy import text
+        try:
+            await conn.execute(text('ALTER TABLE "StoreSettings" ADD COLUMN "aiPersonaTone" VARCHAR DEFAULT \'Friendly & Convincing\''))
+        except Exception as e:
+            pass
 
 @app.get("/{full_path:path}")
 async def serve_spa(full_path: str):
