@@ -23,6 +23,7 @@ class StoreSettings(Base):
     quietHoursStart = Column(String, default="22:00")
     quietHoursEnd = Column(String, default="08:00")
     allowFreeShipping = Column(Boolean, default=False)
+    aiPersonaTone = Column(String, default="friendly")
     
     createdAt = Column(DateTime, default=datetime.utcnow)
     updatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
