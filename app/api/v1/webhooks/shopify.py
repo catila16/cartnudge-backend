@@ -13,7 +13,9 @@ async def shopify_checkout_update(request: Request, background_tasks: Background
     Webhook endpoint for Shopify checkouts/update.
     """
     payload_data = await request.json()
-    checkout = payload_data.get("checkout", {})
+    
+    # Shopify checkouts/update webhook sends the checkout directly as the root JSON object
+    checkout = payload_data if "token" in payload_data else payload_data.get("checkout", {})
     store_settings = payload_data.get("store_settings", {})
     
     checkout_token = checkout.get("token")
