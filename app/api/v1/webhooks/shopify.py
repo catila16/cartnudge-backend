@@ -1,5 +1,9 @@
-from fastapi import APIRouter, Request, BackgroundTasks
+from fastapi import APIRouter, Request, BackgroundTasks, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 from app.workers.cart_scheduler import schedule_cart_recovery
+from app.core.database import get_db
+from app.models.conversation import Conversation
 
 router = APIRouter()
 
@@ -8,7 +12,7 @@ from cachetools import TTLCache
 _scheduled_checkouts = TTLCache(maxsize=1000, ttl=3600) # 1 hour TTL
 
 @router.post("/checkouts/update")
-async def shopify_checkout_update(request: Request, background_tasks: BackgroundTasks):
+async def shopify_checkout_update(request: Request, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     """
     Webhook endpoint for Shopify checkouts/update.
     """
@@ -59,6 +63,26 @@ async def shopify_checkout_update(request: Request, background_tasks: Background
             
         # We delegate the delay logic to Celery
         print(f"Checkout update received: {checkout_token}. Scheduling recovery...")
+        
+        # Upsert conversation in database
+        stmt = select(Conversation).where(Conversation.id == checkout_token)
+        result = await db.execute(stmt)
+        conversation = result.scalars().first()
+        
+        if not conversation:
+            cart_value = total_price
+            items_summary = ", ".join([f"{item.get('quantity', 1)}x {item.get('title', 'Item')}" for item in line_items])
+            conversation = Conversation(
+                id=checkout_token,
+                customer_phone=customer_phone,
+                cart_value=cart_value,
+                items_summary=items_summary,
+                status="PENDING",
+                store_id="cartnudge-test"
+            )
+            db.add(conversation)
+            await db.commit()
+        
         schedule_cart_recovery(
             conversation_id=checkout_token, 
             store_settings=store_settings,
