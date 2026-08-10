@@ -31,7 +31,7 @@ async def get_analytics_summary(db: AsyncSession = Depends(get_db)):
 
     active_sessions_result = await db.execute(
         select(func.count(Conversation.id)).where(
-            Conversation.status.in_([ConversationStatus.NEGOTIATION, ConversationStatus.HUMAN_ACTIVE])
+            Conversation.status.in_([ConversationStatus.PENDING, ConversationStatus.NEGOTIATION, ConversationStatus.HUMAN_ACTIVE])
         )
     )
     active_sessions = active_sessions_result.scalar() or 0
@@ -57,7 +57,7 @@ async def get_analytics_summary(db: AsyncSession = Depends(get_db)):
 async def get_active_conversations(db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Conversation)
-        .where(Conversation.status.in_([ConversationStatus.NEGOTIATION, ConversationStatus.HUMAN_ACTIVE, ConversationStatus.SUCCESS]))
+        .where(Conversation.status.in_([ConversationStatus.PENDING, ConversationStatus.NEGOTIATION, ConversationStatus.HUMAN_ACTIVE, ConversationStatus.SUCCESS]))
         .order_by(Conversation.scheduled_at.desc())
         .limit(20)
     )
