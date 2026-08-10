@@ -70,15 +70,14 @@ async def shopify_checkout_update(request: Request, background_tasks: Background
         conversation = result.scalars().first()
         
         if not conversation:
-            cart_value = total_price
-            items_summary = ", ".join([f"{item.get('quantity', 1)}x {item.get('title', 'Item')}" for item in line_items])
+            import datetime
             conversation = Conversation(
                 id=checkout_token,
                 customer_phone=customer_phone,
-                cart_value=cart_value,
-                items_summary=items_summary,
+                cart_data={"total_price": total_price, "line_items": line_items},
                 status="PENDING",
-                store_id="cartnudge-test"
+                store_id="cartnudge-test",
+                scheduled_at=datetime.datetime.utcnow() + datetime.timedelta(minutes=store_settings.get("cartAbandonmentDelay", 15))
             )
             db.add(conversation)
             await db.commit()
