@@ -1,55 +1,48 @@
-import requests
-import time
+import hmac
+import hashlib
+import base64
+import json
+import urllib.request
+import urllib.error
 
-url = "http://127.0.0.1:8000/api/v1/webhooks/shopify/checkouts/update"
+secret = "dummy_secret"
+url = "http://localhost:8000/api/v1/webhooks/shopify/checkouts/update"
 
-def send_test(name, payload):
-    print(f"\n--- Testing: {name} ---")
-    try:
-        response = requests.post(url, json=payload, timeout=2)
-        print(f"Status: {response.status_code}")
-        print(f"Response: {response.json()}")
-    except Exception as e:
-        print(f"Error: {e}")
-
-base_settings = {
-    "maxDiscountMargin": 15,
-    "cartAbandonmentDelay": 50,
-    "cartFollowupHours": 12,
-    "minCartAmount": 40,
-    "quietHoursEnabled": True,
-    "quietHoursStart": "23:00",
-    "quietHoursEnd": "09:00",
-    "allowFreeShipping": True
+payload = {
+    "token": "test-checkout-12345",
+    "total_price": "45.00",
+    "phone": "+905345900476",
+    "customer": {
+        "first_name": "Caner",
+    },
+    "abandoned_checkout_url": "https://test.myshopify.com/checkouts/test-12345",
+    "shipping_address": {
+        "country_code": "TR"
+    },
+    "store_settings": {
+        "cartAbandonmentDelay": 1,
+        "minCartAmount": 10
+    }
 }
 
-# Test 1: Below Min Cart
-send_test("Below Min Cart Amount ($30)", {
-    "checkout": {
-        "token": "token_below_min_cart",
-        "total_price": "30.00"
-    },
-    "store_settings": base_settings
-})
+body = json.dumps(payload).encode('utf-8')
 
-time.sleep(1)
+digest = hmac.new(secret.encode('utf-8'), body, hashlib.sha256).digest()
+hmac_header = base64.b64encode(digest).decode('utf-8')
 
-# Test 2: Above Min Cart
-send_test("Valid Cart Amount ($50)", {
-    "checkout": {
-        "token": "token_valid_cart",
-        "total_price": "50.00"
-    },
-    "store_settings": base_settings
-})
+req = urllib.request.Request(url, data=body)
+req.add_header('Content-Type', 'application/json')
+req.add_header('X-Shopify-Hmac-Sha256', hmac_header)
 
-time.sleep(1)
+print(f"Sending webhook to {url}")
+print(f"HMAC Header: {hmac_header}")
 
-# Test 3: Idempotency (Duplicate token)
-send_test("Duplicate Token", {
-    "checkout": {
-        "token": "token_valid_cart",
-        "total_price": "50.00"
-    },
-    "store_settings": base_settings
-})
+try:
+    with urllib.request.urlopen(req) as response:
+        print("Response Code:", response.getcode())
+        print("Response Body:", response.read().decode())
+except urllib.error.HTTPError as e:
+    print("HTTP Error:", e.code)
+    print("Error Body:", e.read().decode())
+except Exception as e:
+    print("Error:", e)

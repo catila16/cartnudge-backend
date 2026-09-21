@@ -115,7 +115,8 @@ async def get_settings(db: AsyncSession = Depends(get_db)):
     return {
         "tone": store.aiPersonaTone,
         "maxDiscount": store.maxDiscountMargin,
-        "quietHours": store.quietHoursEnabled
+        "quietHours": store.quietHoursEnabled,
+        "billingStatus": store.billing_status
     }
 
 @router.put("/settings")

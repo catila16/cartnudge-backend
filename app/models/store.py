@@ -12,6 +12,18 @@ class StoreSettings(Base):
     id = Column(String, primary_key=True, default=generate_uuid)
     shop = Column(String, unique=True, nullable=False)
     
+    # OAuth Fields
+    access_token = Column(String, nullable=True) # Offline Access Token
+    nonce = Column(String, nullable=True) # CSRF protection state
+    
+    # Phase 22 & Billing Fields
+    country_code = Column(String(5), default="US", nullable=False)
+    billing_charge_id = Column(String, nullable=True) # Shopify App Subscription ID
+    billing_status = Column(String, default="PENDING") # PENDING, ACTIVE, EXPIRED, DECLINED
+    trial_ends_at = Column(DateTime, nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    uninstalled_at = Column(DateTime, nullable=True)
+    
     maxDiscountMargin = Column(Integer, default=15)
     cartAbandonmentDelay = Column(Integer, default=60)
     cartFollowupHours = Column(Integer, default=24)

@@ -1,7 +1,12 @@
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env
+load_dotenv()
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-import os
 from app.api.v1.webhooks import shopify, whatsapp, gdpr
 from app.api.v1 import live_support
 from app.core.database import engine, Base
@@ -16,7 +21,7 @@ async def add_csp_header(request: Request, call_next):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["http://localhost:5173", "http://localhost:3005", "https://trycartnudge.com", "https://www.trycartnudge.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -28,8 +33,11 @@ app.include_router(whatsapp.router, prefix="/api/v1/webhooks/whatsapp", tags=["W
 app.include_router(gdpr.router, prefix="/api/v1/webhooks/gdpr", tags=["GDPR Webhooks"])
 app.include_router(live_support.router, prefix="/api/v1/live-support", tags=["Live Support"])
 
-from app.api.v1 import dashboard
+from app.api.v1 import dashboard, admin, billing, auth
 app.include_router(dashboard.router)
+app.include_router(admin.router)
+app.include_router(billing.router)
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["OAuth"])
 
 @app.on_event("startup")
 async def on_startup():
@@ -46,9 +54,48 @@ async def on_startup():
         # Quick migration for new columns
         from sqlalchemy import text
         try:
+            await conn.execute(text('ALTER TABLE "StoreSettings" ADD COLUMN "access_token" VARCHAR'))
+        except Exception: pass
+            
+        try:
+            await conn.execute(text('ALTER TABLE "StoreSettings" ADD COLUMN "nonce" VARCHAR'))
+        except Exception: pass
+        
+        try:
             await conn.execute(text('ALTER TABLE "StoreSettings" ADD COLUMN "aiPersonaTone" VARCHAR DEFAULT \'Friendly & Convincing\''))
-        except Exception as e:
-            pass
+        except Exception: pass
+            
+        try:
+            await conn.execute(text('ALTER TABLE "StoreSettings" ADD COLUMN "country_code" VARCHAR(5) DEFAULT \'US\''))
+        except Exception: pass
+            
+        try:
+            await conn.execute(text('ALTER TABLE "StoreSettings" ADD COLUMN "is_active" BOOLEAN DEFAULT 1'))
+        except Exception: pass
+            
+        try:
+            await conn.execute(text('ALTER TABLE "StoreSettings" ADD COLUMN "uninstalled_at" DATETIME'))
+        except Exception: pass
+            
+        try:
+            await conn.execute(text('ALTER TABLE "StoreSettings" ADD COLUMN "billing_charge_id" VARCHAR'))
+        except Exception: pass
+            
+        try:
+            await conn.execute(text('ALTER TABLE "StoreSettings" ADD COLUMN "billing_status" VARCHAR DEFAULT \'PENDING\''))
+        except Exception: pass
+            
+        try:
+            await conn.execute(text('ALTER TABLE "StoreSettings" ADD COLUMN "trial_ends_at" DATETIME'))
+        except Exception: pass
+            
+        try:
+            await conn.execute(text('ALTER TABLE "conversations" ADD COLUMN "last_customer_message_at" DATETIME'))
+        except Exception: pass
+        
+        try:
+            await conn.execute(text('ALTER TABLE "conversations" ADD COLUMN "chat_history" JSON DEFAULT \'[]\''))
+        except Exception: pass
 
 @app.get("/{full_path:path}")
 async def serve_spa(full_path: str):

@@ -27,3 +27,7 @@ class Conversation(Base):
     commission_earned = Column(Numeric(10, 2), default=0.00)
     
     last_human_activity_at = Column(DateTime, nullable=True)
+    
+    # Phase 18: 24h Window & OpenAI Context
+    last_customer_message_at = Column(DateTime(timezone=True), nullable=True)
+    chat_history = Column(JSON, default=list, nullable=False)

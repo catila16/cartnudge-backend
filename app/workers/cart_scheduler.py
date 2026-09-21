@@ -6,31 +6,33 @@ from datetime import datetime, timedelta
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 celery_app = Celery("cartnudge_workers", broker=REDIS_URL, backend=REDIS_URL)
 
-# For production, Celery uses Redis.
-# celery_app.conf.task_always_eager = False
+# For local testing without Redis, set task_always_eager to True
+celery_app.conf.task_always_eager = True
 
-@celery_app.task
-def trigger_first_contact(conversation_id: str, customer_phone: str = "+905551234567", line_items: list = None):
+from app.services.twilio_service import twilio_service
+
+@celery_app.task(name="trigger_first_contact")
+def trigger_first_contact(
+    phone: str, 
+    customer_name: str, 
+    checkout_url: str, 
+    country_code: str = None
+):
     """
-    1. Saat dolduğunda tetiklenir.
-    Veritabanından conversation_id bulunur, hala SCHEDULED veya PENDING ise
-    ilk WhatsApp mesajı atılır.
+    Kullanıcıya ilk temas olarak Meta onaylı şablon mesajını gönderir.
     """
-    from app.services.twilio_service import send_whatsapp_message
-    from app.services.openai_service import generate_cart_recovery_message
-    
-    # TODO: Fetch from DB using async to sync wrapper to check status
-    print(f"Triggering first contact for conversation: {conversation_id}")
-    
-    # Generate message using OpenAI based on cart items
-    initial_message = generate_cart_recovery_message(line_items)
-    print("\n" + "="*50)
-    print(f"[AI GENERATED MESSAGE]\n{initial_message}")
-    print("="*50 + "\n")
-    
-    # Send via Twilio
-    send_whatsapp_message(customer_phone, initial_message)
-    return True
+    if not phone:
+        return {"status": "skipped", "reason": "Telefon numarası bulunamadı"}
+
+    print(f"Triggering first contact via template for: {phone}")
+
+    result = twilio_service.send_whatsapp_template(
+        to_phone=phone,
+        customer_name=customer_name,
+        checkout_url=checkout_url,
+        country_code=country_code
+    )
+    return result
 
 @celery_app.task
 def trigger_followup_contact(conversation_id: str):
@@ -68,7 +70,15 @@ def apply_quiet_hours(target_time: datetime, start_str: str, end_str: str) -> tu
         
     return target_time, False
 
-def schedule_cart_recovery(conversation_id: str, store_settings: dict = None, customer_phone: str = None, line_items: list = None):
+def schedule_cart_recovery(
+    conversation_id: str, 
+    store_settings: dict = None, 
+    customer_phone: str = None, 
+    line_items: list = None,
+    first_name: str = "Customer",
+    checkout_url: str = "",
+    country_code: str = None
+):
     """
     Shopify'dan checkouts/update geldiğinde bu foksiyon çağrılır.
     """
@@ -107,7 +117,7 @@ def schedule_cart_recovery(conversation_id: str, store_settings: dict = None, cu
 
     # Schedule first contact
     trigger_first_contact.apply_async(
-        args=[conversation_id, customer_phone, line_items], 
+        args=[customer_phone, first_name, checkout_url, country_code], 
         countdown=countdown_1
     )
     

@@ -1,42 +1,111 @@
 import os
+import json
+import phonenumbers
 from twilio.rest import Client
+from twilio.base.exceptions import TwilioRestException
 
-TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
-TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
-TWILIO_FROM_NUMBER = os.getenv("TWILIO_WHATSAPP_NUMBER", os.getenv("TWILIO_FROM_NUMBER", "whatsapp:+14155238886")) # Default Twilio Sandbox Number
+class TwilioService:
+    def __init__(self):
+        self.account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+        self.auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+        self.from_number = os.getenv("TWILIO_WHATSAPP_NUMBER", "whatsapp:+14155238886")
+        
+        # Twilio Content Template SID'leri (.env üzerinden tanımlanabilir)
+        self.template_sids = {
+            "tr": os.getenv("TWILIO_TEMPLATE_SID_TR", "HX_TR_TEMPLATE_SID"),
+            "de": os.getenv("TWILIO_TEMPLATE_SID_DE", "HX_DE_TEMPLATE_SID"),
+            "en": os.getenv("TWILIO_TEMPLATE_SID_EN", "HX_EN_TEMPLATE_SID"),
+        }
 
-# Initialize client only if credentials are provided
-client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN) if TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN else None
+        if self.account_sid and self.auth_token:
+            self.client = Client(self.account_sid, self.auth_token)
+        else:
+            self.client = None
 
-def send_whatsapp_message(to_number: str, message: str) -> bool:
-    """
-    Sends a WhatsApp message using Twilio API.
-    If credentials are not configured, it simulates the sending via logs.
-    """
-    if not to_number:
-        print("Error: Cannot send WhatsApp message because phone number is missing.")
-        return False
+    def detect_language(self, phone_number: str, country_code: str = None) -> str:
+        """
+        Ülke kodu veya telefon numarasından dil tespiti yapar.
+        """
+        if country_code:
+            code = country_code.upper()
+            if code in ["TR"]: return "tr"
+            if code in ["DE", "AT", "CH"]: return "de"
 
-    # Format the number for WhatsApp if not already formatted
-    if not to_number.startswith("whatsapp:"):
-        to_number = f"whatsapp:{to_number}"
+        try:
+            parsed = phonenumbers.parse(phone_number, None)
+            region = phonenumbers.region_code_for_number(parsed)
+            if region == "TR": return "tr"
+            if region in ["DE", "AT", "CH"]: return "de"
+        except Exception:
+            pass
 
-    if not client:
-        print("\n" + "="*50)
-        print(f"📞 [MOCK TWILIO] MESSAGE SIMULATOR")
-        print(f"TO: {to_number}")
-        print(f"MESSAGE:\n{message}")
-        print("="*50 + "\n")
-        return True
+        return "en"  # Varsayılan global dil
 
-    try:
-        msg = client.messages.create(
-            from_=TWILIO_FROM_NUMBER,
-            body=message,
-            to=to_number
-        )
-        print(f"Twilio message sent successfully! SID: {msg.sid}")
-        return True
-    except Exception as e:
-        print(f"Error sending Twilio message: {e}")
-        return False
+    def format_to_e164(self, phone_number: str) -> str:
+        try:
+            parsed = phonenumbers.parse(phone_number, None)
+            return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
+        except Exception:
+            return phone_number if phone_number.startswith("+") else f"+{phone_number}"
+
+    def send_whatsapp_template(
+        self, 
+        to_phone: str, 
+        customer_name: str, 
+        checkout_url: str, 
+        country_code: str = None
+    ) -> dict:
+        """
+        Meta onaylı Twilio Content Template mesajı fırlatır.
+        """
+        e164_number = self.format_to_e164(to_phone)
+        whatsapp_to = f"whatsapp:{e164_number}"
+        lang = self.detect_language(e164_number, country_code)
+        content_sid = self.template_sids.get(lang, self.template_sids["en"])
+
+        # Şablon değişkenleri: {{1}} -> İsim, {{2}} -> Checkout Linki
+        content_variables = json.dumps({
+            "1": customer_name or "there",
+            "2": checkout_url
+        })
+
+        if not self.client:
+            print(f"[Twilio Dry-Run] Template SID: {content_sid} | To: {whatsapp_to} | Vars: {content_variables}")
+            return {"status": "simulated", "content_sid": content_sid, "to": whatsapp_to}
+
+        try:
+            message = self.client.messages.create(
+                from_=self.from_number,
+                to=whatsapp_to,
+                content_sid=content_sid,
+                content_variables=content_variables
+            )
+            return {"status": "success", "sid": message.sid, "state": message.status}
+        except TwilioRestException as e:
+            print(f"[Twilio Error] {e.msg}")
+            return {"status": "error", "message": e.msg}
+
+    def send_whatsapp_message(self, to_phone: str, message: str) -> dict:
+        """
+        Meta kuralları gereği müşteri cevap verdikten sonra 24 saat içinde 
+        serbest metin (free-form) mesaj göndermek için kullanılır.
+        """
+        e164_number = self.format_to_e164(to_phone)
+        whatsapp_to = f"whatsapp:{e164_number}"
+
+        if not self.client:
+            print(f"[Twilio Dry-Run] Text Message | To: {whatsapp_to} | Body: {message}")
+            return {"status": "simulated", "to": whatsapp_to, "body": message}
+
+        try:
+            msg = self.client.messages.create(
+                from_=self.from_number,
+                to=whatsapp_to,
+                body=message
+            )
+            return {"status": "success", "sid": msg.sid, "state": msg.status}
+        except TwilioRestException as e:
+            print(f"[Twilio Error] {e.msg}")
+            return {"status": "error", "message": e.msg}
+
+twilio_service = TwilioService()

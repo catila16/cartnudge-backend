@@ -13,3 +13,4 @@ python-dotenv==1.0.1
 python-multipart==0.0.9
 cachetools==5.3.3
 psycopg2-binary==2.9.9
+phonenumbers>=8.13.0
