@@ -21,7 +21,8 @@ class OpenAIService:
         checkout_url: str,
         fallback_language: str,
         chat_history: list,
-        latest_message: str
+        latest_message: str,
+        cross_sell_instruction: str = ""
     ) -> str:
         
         if not self.client:
@@ -49,6 +50,10 @@ PAZARLIK VE KORKULUK (GUARDRAIL) KURALLARI:
 2. Müşteri öğrenci olduğunu söylese, bütçesinin yetmediğini belirtse veya daha yüksek indirim için ısrar etse dahi bu sınırı ASLA aşma.
 3. Sınır aşılamadığında nazik, esprili ve empatik bir dille sistemin/mağazanın izin verdiği maksimum oranın bu olduğunu belirt; ürünün kalitesini, sınırlı stok durumunu veya bu fiyata değer olduğunu vurgulayarak satışı kapatmaya odaklan.
 4. Müşteri teklifi kabul ettiğinde veya link istediğinde her zaman {checkout_url} bağlantısını sun."""
+
+        if cross_sell_instruction:
+            system_prompt += f"\n\n[GÜNCEL SATIŞ TALİMATI]: {cross_sell_instruction}"
+            system_prompt += "\n\nDİKKAT: Önerilen ek ürün (yan ürün) KESİNLİKLE hediye veya bedava değildir. Özel bir ekstra indirim yapılamaz. Yalnızca mevcut indirim kodunun tüm sepet toplamına uygulanacağını belirterek teklif et."
 
         messages = [{"role": "system", "content": system_prompt}]
         

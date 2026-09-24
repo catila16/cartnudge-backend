@@ -41,7 +41,7 @@ def get_language_from_phone(phone: str) -> str:
     if phone.startswith("39"): return "it"
     return "en"
 
-def process_whatsapp_message(from_number: str, body: str):
+async def process_whatsapp_message(from_number: str, body: str):
     db: Session = SessionLocal()
     try:
         clean_phone = from_number.replace("+", "").strip()
@@ -121,12 +121,20 @@ def process_whatsapp_message(from_number: str, body: str):
         
         currency = cart_data.get("currency", "TRY")
         
-        # Shopify Cart Permalink
-        checkout_url = f"https://{conversation.store_id}/cart"
-        if variant_strings:
-            checkout_url = f"https://{conversation.store_id}/cart/{','.join(variant_strings)}?discount=NUDGE{discount_pct}"
-        else:
-            checkout_url = f"https://{conversation.store_id}/cart?discount=NUDGE{discount_pct}"
+        # CROSS-SELL (Phase 1)
+        cross_sell_agent = ShopifyCrossSellAgent(shop_domain=conversation.store_id, access_token="mock_token")
+        cross_sell_data = await cross_sell_agent.get_smart_cross_sell(
+            cart_items=line_items,
+            discount_code=f"NUDGE{discount_pct}",
+            max_ratio=0.25
+        )
+        
+        # Görev 5: DB Log Analytics
+        if cross_sell_data.get("has_upsell") and cross_sell_data.get("offered_variant_id"):
+            conversation.offered_cross_sell_variant_id = cross_sell_data["offered_variant_id"]
+            
+        checkout_url = cross_sell_data.get("checkout_url")
+        prompt_context = cross_sell_data.get("prompt_context", "")
             
         fallback_language = {"tr": "Türkçe", "en": "İngilizce", "de": "Almanca", "fr": "Fransızca", "es": "İspanyolca", "it": "İtalyanca"}.get(lang_code, "İngilizce")
 
@@ -140,7 +148,8 @@ def process_whatsapp_message(from_number: str, body: str):
             checkout_url=checkout_url,
             fallback_language=fallback_language,
             chat_history=history,
-            latest_message=body
+            latest_message=body,
+            cross_sell_instruction=prompt_context
         )
 
         # 6. Sohbet Geçmişini Güncelle

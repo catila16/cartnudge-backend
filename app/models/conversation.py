@@ -31,3 +31,6 @@ class Conversation(Base):
     # Phase 18: 24h Window & OpenAI Context
     last_customer_message_at = Column(DateTime(timezone=True), nullable=True)
     chat_history = Column(JSON, default=list, nullable=False)
+    
+    # Phase 1 Analytics
+    offered_cross_sell_variant_id = Column(String, nullable=True)
