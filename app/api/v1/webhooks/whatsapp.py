@@ -1,3 +1,4 @@
+from app.services.cross_sell_service import ShopifyCrossSellAgent
 import os
 import json
 from datetime import datetime, timezone, timedelta
@@ -151,17 +152,25 @@ async def process_whatsapp_message(from_number: str, body: str):
             latest_message=body,
             cross_sell_instruction=prompt_context
         )
+        reply_content = ai_reply.get("content", "Anlayışla karşılıyoruz, iyi günler dileriz.") if isinstance(ai_reply, dict) else ai_reply
+        
+        # Görev 7: Kayıp Satış Analizi İşlemi
+        if isinstance(ai_reply, dict) and ai_reply.get("type") == "tool":
+            conversation.status = ConversationStatus.DECLINED
+            conversation.lost_sale_category = ai_reply.get("category")
+            conversation.lost_sale_detail = ai_reply.get("detail")
+            logger.info(f"Lost sale detected: {conversation.lost_sale_category} - {conversation.lost_sale_detail}")
 
         # 6. Sohbet Geçmişini Güncelle
         history.append({"role": "user", "content": body})
-        history.append({"role": "assistant", "content": ai_reply})
+        history.append({"role": "assistant", "content": reply_content})
         conversation.chat_history = history
         
         flag_modified(conversation, "chat_history")
         db.commit()
 
         # 7. Yanıtı Meta API İle Doğrudan Gönder
-        meta_whatsapp_service.send_whatsapp_message(from_number, ai_reply)
+        meta_whatsapp_service.send_whatsapp_message(from_number, reply_content)
 
     except Exception as e:
         logger.error(f"Error processing WhatsApp message: {e}")

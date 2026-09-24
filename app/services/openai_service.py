@@ -23,7 +23,7 @@ class OpenAIService:
         chat_history: list,
         latest_message: str,
         cross_sell_instruction: str = ""
-    ) -> str:
+    ) -> dict:
         
         if not self.client:
             logger.error("OpenAI API key missing!")
@@ -55,6 +55,9 @@ PAZARLIK VE KORKULUK (GUARDRAIL) KURALLARI:
             system_prompt += f"\n\n[GÜNCEL SATIŞ TALİMATI]: {cross_sell_instruction}"
             system_prompt += "\n\nDİKKAT: Önerilen ek ürün (yan ürün) KESİNLİKLE hediye veya bedava değildir. Özel bir ekstra indirim yapılamaz. Yalnızca mevcut indirim kodunun tüm sepet toplamına uygulanacağını belirterek teklif et."
 
+        system_prompt += "\n\nDİKKAT (MÜZAKEREYİ ERKEN ÖLDÜRMEME): Müşteri 'Pahalı geldi, biraz indirim yapamaz mısınız?' gibi pazarlık cümleleri kuruyorsa satışı kayıp olarak görme; pazarlık motorunu çalıştır. Sadece ve sadece müşteri indirimi reddettiğinde veya net bir şekilde almayacağını ('Vazgeçtim', 'İstemiyorum', 'Çok pahalı almayacağım') söylediğinde report_lost_sale aracını tetikle."
+
+
         messages = [{"role": "system", "content": system_prompt}]
         
         # Add valid history
@@ -65,16 +68,61 @@ PAZARLIK VE KORKULUK (GUARDRAIL) KURALLARI:
         # Add latest user message
         messages.append({"role": "user", "content": latest_message})
 
+        
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "report_lost_sale",
+                    "description": "Müşteri satışı kesin olarak reddettiğinde, vazgeçtiğinde veya ilgilenmediğini belirttiğinde çağrılır. Müzakere sürüyorsa (örn: 'indirim var mı?' diyorsa) ASLA çağrılmaz.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "category": {
+                                "type": "string",
+                                "enum": ["PRICE_TOO_HIGH", "SHIPPING_COST", "SHIPPING_TIME", "COMPETITOR", "POSTPONED", "NOT_INTERESTED", "OTHER"],
+                                "description": "Kaybın ana nedeni."
+                            },
+                            "detail": {
+                                "type": "string",
+                                "description": "Müşterinin vazgeçme gerekçesinin 1-2 cümlelik net Türkçe özeti."
+                            },
+                            "farewell_message": {
+                                "type": "string",
+                                "description": "Müşteriye WhatsApp'tan gönderilecek son derece nazik, anlayışlı, kapıyı açık bırakan veda mesajı."
+                            }
+                        },
+                        "required": ["category", "detail", "farewell_message"]
+                    }
+                }
+            }
+        ]
         try:
             response = self.client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=messages,
                 temperature=0.6,
-                max_tokens=200
+                max_tokens=300,
+                tools=tools
             )
-            return response.choices[0].message.content.strip()
+            
+            message = response.choices[0].message
+            if message.tool_calls:
+                for tool_call in message.tool_calls:
+                    if tool_call.function.name == "report_lost_sale":
+                        args = json.loads(tool_call.function.arguments)
+                        return {
+                            "type": "tool",
+                            "category": args.get("category"),
+                            "detail": args.get("detail"),
+                            "content": args.get("farewell_message", "Anlayışla karşılıyoruz, iyi günler dileriz.")
+                        }
+            
+            return {"type": "text", "content": message.content.strip() if message.content else "Tamamdır, iyi günler!"}
+            
         except Exception as e:
             logger.error(f"OpenAI error: {e}")
-            return f"Harika bir tercih {customer_name}! Sepetindeki ürünler tükenmeden alışverişini tamamlamak istersen linkin burada: {checkout_url}"
+            return {"type": "text", "content": f"Harika bir tercih {customer_name}! Sepetindeki ürünler tükenmeden alışverişini tamamlamak istersen linkin burada: {checkout_url}"}
+
 
 openai_service = OpenAIService()

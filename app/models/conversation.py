@@ -34,3 +34,5 @@ class Conversation(Base):
     
     # Phase 1 Analytics
     offered_cross_sell_variant_id = Column(String, nullable=True)
+    lost_sale_category = Column(String, nullable=True)
+    lost_sale_detail = Column(String, nullable=True)
