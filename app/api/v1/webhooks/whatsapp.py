@@ -1,3 +1,7 @@
+from app.services.voice_engine import AntigravityVoiceResolver
+from app.services.gemini_agent import gemini_agent
+import os
+
 from app.services.cross_sell_service import ShopifyCrossSellAgent
 import os
 import json
@@ -139,28 +143,29 @@ async def process_whatsapp_message(from_number: str, body: str):
             
         fallback_language = {"tr": "Türkçe", "en": "İngilizce", "de": "Almanca", "fr": "Fransızca", "es": "İspanyolca", "it": "İtalyanca"}.get(lang_code, "İngilizce")
 
-        ai_reply = openai_service.process_negotiation_reply(
-            store_name=conversation.store_id,
-            customer_name="Değerli Müşterimiz",
-            cart_items_str=items_str,
-            cart_total=f"{cart_total_val:.2f}",
-            currency=currency,
-            max_discount_rate=discount_pct,
-            checkout_url=checkout_url,
-            fallback_language=fallback_language,
-            chat_history=history,
-            latest_message=body,
-            cross_sell_instruction=prompt_context
+        instruction = gemini_agent.build_system_instruction(
+            shop_domain=conversation.store_id,
+            cart_summary=items_str,
+            discount_ceiling=f"%{discount_pct}",
+            cross_sell_context=prompt_context,
+            customer_language=fallback_language
         )
-        reply_content = ai_reply.get("content", "Anlayışla karşılıyoruz, iyi günler dileriz.") if isinstance(ai_reply, dict) else ai_reply
         
-        # Görev 7: Kayıp Satış Analizi İşlemi
-        if isinstance(ai_reply, dict) and ai_reply.get("type") == "tool":
+        result = await gemini_agent.execute_turn(
+            user_message=body,
+            chat_history=history,
+            system_instruction=instruction
+        )
+        
+        if result["type"] == "LOST_SALE":
             conversation.status = ConversationStatus.DECLINED
-            conversation.lost_sale_category = ai_reply.get("category")
-            conversation.lost_sale_detail = ai_reply.get("detail")
+            conversation.lost_sale_category = result.get("category")
+            conversation.lost_sale_detail = result.get("detail")
             logger.info(f"Lost sale detected: {conversation.lost_sale_category} - {conversation.lost_sale_detail}")
-
+            reply_content = result.get("farewell_message", "Anlayışla karşılıyoruz, iyi günler dileriz.")
+        else:
+            reply_content = result.get("reply_text", "Hata oluştu.")
+            
         # 6. Sohbet Geçmişini Güncelle
         history.append({"role": "user", "content": body})
         history.append({"role": "assistant", "content": reply_content})
@@ -193,6 +198,32 @@ async def verify_webhook(
         
     raise HTTPException(status_code=403, detail="Verification failed")
 
+
+async def process_whatsapp_audio(from_number: str, media_id: str):
+    try:
+        audio_bytes = await meta_whatsapp_service.download_media_bytes(media_id)
+        lang_code = get_language_from_phone(from_number.replace("+", "").strip())
+        resolver = AntigravityVoiceResolver(openai_api_key=os.getenv("OPENAI_API_KEY"))
+        
+        if not audio_bytes:
+            err_msg = resolver.get_fallback_text(lang_code, "audio_error")
+            meta_whatsapp_service.send_whatsapp_message(from_number, err_msg)
+            return
+            
+        res = await resolver.transcribe_voice(audio_bytes, customer_locale=lang_code)
+        if not res.get("success") or not res.get("text"):
+            err_msg = resolver.get_fallback_text(lang_code, "not_understood")
+            meta_whatsapp_service.send_whatsapp_message(from_number, err_msg)
+            return
+            
+        transcribed_text = res["text"]
+        logger.info(f"Transcribed audio from {from_number}: {transcribed_text}")
+        
+        # Now pass to normal message processor
+        await process_whatsapp_message(from_number, transcribed_text)
+    except Exception as e:
+        logger.error(f"process_whatsapp_audio error: {e}")
+
 @router.post("/incoming")
 async def receive_whatsapp_reply(
     request: Request,
@@ -214,11 +245,22 @@ async def receive_whatsapp_reply(
             messages = value.get("messages", [])
             
             for msg in messages:
-                if msg.get("type") == "text":
-                    from_number = msg.get("from")
+                msg_id = msg.get("id")
+                if msg_id:
+                    # Blue tick!
+                    background_tasks.add_task(meta_whatsapp_service.mark_message_as_read, msg_id)
+                
+                from_number = msg.get("from")
+                msg_type = msg.get("type")
+                
+                if msg_type == "text":
                     text_body = msg.get("text", {}).get("body", "")
-                    
-                    logger.info(f"Incoming Meta WhatsApp message from {from_number}: {text_body}")
+                    logger.info(f"Incoming Meta text from {from_number}: {text_body}")
                     background_tasks.add_task(process_whatsapp_message, from_number, text_body)
+                elif msg_type == "audio":
+                    media_id = msg.get("audio", {}).get("id")
+                    logger.info(f"Incoming Meta audio from {from_number}, media_id: {media_id}")
+                    # Process audio
+                    background_tasks.add_task(process_whatsapp_audio, from_number, media_id)
 
     return {"status": "ok"}
