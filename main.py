@@ -61,6 +61,7 @@ async def on_startup():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         
+        
         # Quick migration for new columns
         from sqlalchemy import text
         is_pg = "postgres" in DATABASE_URL
@@ -91,7 +92,8 @@ async def on_startup():
         
         for q in migrations:
             try:
-                await conn.execute(text(q))
+                async with engine.begin() as migration_conn:
+                    await migration_conn.execute(text(q))
             except Exception as e:
                 pass
 
