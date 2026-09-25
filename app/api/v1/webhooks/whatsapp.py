@@ -1,3 +1,5 @@
+import hmac
+import hashlib
 from app.services.voice_engine import AntigravityVoiceResolver
 from app.services.gemini_agent import gemini_agent
 import os
@@ -224,17 +226,41 @@ async def process_whatsapp_audio(from_number: str, media_id: str):
     except Exception as e:
         logger.error(f"process_whatsapp_audio error: {e}")
 
+
+def verify_meta_signature(payload: bytes, signature_header: str, app_secret: str) -> bool:
+    if not signature_header or not signature_header.startswith("sha256="):
+        return False
+    signature = signature_header.split("sha256=")[1]
+    expected_signature = hmac.new(
+        app_secret.encode("utf-8"),
+        payload,
+        hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(signature, expected_signature)
+
 @router.post("/incoming")
 async def receive_whatsapp_reply(
     request: Request,
     background_tasks: BackgroundTasks
 ):
     try:
+        raw_body = await request.body()
         body = await request.json()
     except Exception:
         return {"status": "error", "message": "Invalid JSON"}
 
+    # Spoofing Guard: Verify X-Hub-Signature-256
+    signature = request.headers.get("x-hub-signature-256")
+    app_secret = os.getenv("META_APP_SECRET", "mock_secret") # Using mock for now if not set
+    if app_secret:
+        if not signature:
+            raise HTTPException(status_code=403, detail="X-Hub-Signature-256 header missing")
+        if not verify_meta_signature(raw_body, signature, app_secret):
+            logger.error("Meta Webhook Signature Mismatch! Possible spoofing attack.")
+            raise HTTPException(status_code=403, detail="Invalid signature")
+
     if body.get("object") != "whatsapp_business_account":
+
         return Response(status_code=404)
 
     entries = body.get("entry", [])

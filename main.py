@@ -16,7 +16,14 @@ app = FastAPI(title="CartNudge Backend", version="1.0.0")
 @app.middleware("http")
 async def add_csp_header(request: Request, call_next):
     response = await call_next(request)
-    response.headers["Content-Security-Policy"] = "frame-ancestors https://*.myshopify.com https://admin.shopify.com;"
+    response.headers["Content-Security-Policy"] = "frame-ancestors https://admin.shopify.com https://*.myshopify.com;"
+    
+    # Pre-Flight: Remove X-Frame-Options to avoid conflicting with CSP in embedded mode
+    if "X-Frame-Options" in response.headers:
+        del response.headers["X-Frame-Options"]
+    if "x-frame-options" in response.headers:
+        del response.headers["x-frame-options"]
+        
     return response
 
 app.add_middleware(
@@ -35,6 +42,8 @@ app.include_router(live_support.router, prefix="/api/v1/live-support", tags=["Li
 
 from app.api.v1 import dashboard, admin, billing, auth
 app.include_router(dashboard.router)
+from app.api.v1.routes import dashboard as dashboard_v2
+app.include_router(dashboard_v2.router)
 app.include_router(admin.router)
 app.include_router(billing.router)
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["OAuth"])
