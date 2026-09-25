@@ -28,7 +28,7 @@ async def add_csp_header(request: Request, call_next):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3005", "https://trycartnudge.com", "https://www.trycartnudge.com"],
+    allow_origins=["http://localhost:5173", "http://localhost:3005", "https://trycartnudge.com", "https://www.trycartnudge.com", "https://cartnudge-frontend.vercel.app", "https://admin.shopify.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
