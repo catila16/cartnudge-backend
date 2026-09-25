@@ -60,51 +60,40 @@ async def on_startup():
     # Initialize DB tables for testing (in production use Alembic)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        
         # Quick migration for new columns
         from sqlalchemy import text
-        try:
-            await conn.execute(text('ALTER TABLE "StoreSettings" ADD COLUMN "access_token" VARCHAR'))
-        except Exception: pass
-            
-        try:
-            await conn.execute(text('ALTER TABLE "StoreSettings" ADD COLUMN "nonce" VARCHAR'))
-        except Exception: pass
+        is_pg = "postgres" in DATABASE_URL
+        timestamp_type = "TIMESTAMP" if is_pg else "DATETIME"
+        true_val = "true" if is_pg else "1"
         
-        try:
-            await conn.execute(text('ALTER TABLE "StoreSettings" ADD COLUMN "aiPersonaTone" VARCHAR DEFAULT \'Friendly & Convincing\''))
-        except Exception: pass
-            
-        try:
-            await conn.execute(text('ALTER TABLE "StoreSettings" ADD COLUMN "country_code" VARCHAR(5) DEFAULT \'US\''))
-        except Exception: pass
-            
-        try:
-            await conn.execute(text('ALTER TABLE "StoreSettings" ADD COLUMN "is_active" BOOLEAN DEFAULT 1'))
-        except Exception: pass
-            
-        try:
-            await conn.execute(text('ALTER TABLE "StoreSettings" ADD COLUMN "uninstalled_at" DATETIME'))
-        except Exception: pass
-            
-        try:
-            await conn.execute(text('ALTER TABLE "StoreSettings" ADD COLUMN "billing_charge_id" VARCHAR'))
-        except Exception: pass
-            
-        try:
-            await conn.execute(text('ALTER TABLE "StoreSettings" ADD COLUMN "billing_status" VARCHAR DEFAULT \'PENDING\''))
-        except Exception: pass
-            
-        try:
-            await conn.execute(text('ALTER TABLE "StoreSettings" ADD COLUMN "trial_ends_at" DATETIME'))
-        except Exception: pass
-            
-        try:
-            await conn.execute(text('ALTER TABLE "conversations" ADD COLUMN "last_customer_message_at" DATETIME'))
-        except Exception: pass
+        migrations = [
+            'ALTER TABLE "StoreSettings" ADD COLUMN "access_token" VARCHAR',
+            'ALTER TABLE "StoreSettings" ADD COLUMN "nonce" VARCHAR',
+            'ALTER TABLE "StoreSettings" ADD COLUMN "aiPersonaTone" VARCHAR DEFAULT \'Friendly & Convincing\'',
+            'ALTER TABLE "StoreSettings" ADD COLUMN "country_code" VARCHAR(5) DEFAULT \'US\'',
+            f'ALTER TABLE "StoreSettings" ADD COLUMN "is_active" BOOLEAN DEFAULT {true_val}',
+            f'ALTER TABLE "StoreSettings" ADD COLUMN "uninstalled_at" {timestamp_type}',
+            'ALTER TABLE "StoreSettings" ADD COLUMN "billing_charge_id" VARCHAR',
+            'ALTER TABLE "StoreSettings" ADD COLUMN "billing_status" VARCHAR DEFAULT \'PENDING\'',
+            f'ALTER TABLE "StoreSettings" ADD COLUMN "trial_ends_at" {timestamp_type}',
+            f'ALTER TABLE "conversations" ADD COLUMN "last_customer_message_at" {timestamp_type}',
+            'ALTER TABLE "conversations" ADD COLUMN "chat_history" JSON DEFAULT \'[]\'',
+            'ALTER TABLE "conversations" ADD COLUMN "conversion_type" VARCHAR',
+            'ALTER TABLE "conversations" ADD COLUMN "applied_commission_rate" NUMERIC(4, 2)',
+            'ALTER TABLE "conversations" ADD COLUMN "total_recovered_amount" NUMERIC(10, 2) DEFAULT 0.00',
+            'ALTER TABLE "conversations" ADD COLUMN "commission_earned" NUMERIC(10, 2) DEFAULT 0.00',
+            'ALTER TABLE "conversations" ADD COLUMN "offered_cross_sell_variant_id" VARCHAR',
+            'ALTER TABLE "conversations" ADD COLUMN "lost_sale_category" VARCHAR',
+            'ALTER TABLE "conversations" ADD COLUMN "lost_sale_detail" VARCHAR',
+            f'ALTER TABLE "conversations" ADD COLUMN "last_human_activity_at" {timestamp_type}',
+        ]
         
-        try:
-            await conn.execute(text('ALTER TABLE "conversations" ADD COLUMN "chat_history" JSON DEFAULT \'[]\''))
-        except Exception: pass
+        for q in migrations:
+            try:
+                await conn.execute(text(q))
+            except Exception as e:
+                pass
 
 @app.get("/{full_path:path}")
 async def serve_spa(full_path: str):
