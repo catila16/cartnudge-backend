@@ -75,22 +75,14 @@ async def get_dashboard_data(db: AsyncSession = Depends(get_db)):
                 "ai_insight": ai_insight
             }
             
-        try:
-            ai_insight_model = await advisor_agent.generate_merchant_insight(
-                kpis=kpis,
-                lost_sales=lost_sales,
-                cross_sell_performance=cross_sell_data
-            )
-            ai_insight = ai_insight_model.model_dump()
-        except Exception as api_err:
-            print(f"Gemini API error for advisor: {api_err}")
-            ai_insight = {
-                'headline': 'Break Price Resistance via Voice Discounts',
-                'primary_bottleneck': 'High Price Resistance',
-                'suggested_action': 'Add a 10% limited-time discount to your voice recovery flow and cross-sell Leather Care Cream (25% conversion rate).',
-                'projected_recovery_lift': '+1 Cart / $1,500.00',
-                'urgency_level': 'HIGH'
-            }
+        # Fast mock insight in English for the demo dashboard
+        ai_insight = {
+            'headline': 'Break Price Resistance via Cross-Sell',
+            'primary_bottleneck': 'High Price Sensitivity',
+            'suggested_action': 'Your AI recovery sequence is detecting price resistance. We recommend offering the Leather Care Cream bundle at 25% discount to push conversions.',
+            'projected_recovery_lift': '+1 Cart / $1,500.00',
+            'urgency_level': 'HIGH'
+        }
 
         return {
             "success": True,
