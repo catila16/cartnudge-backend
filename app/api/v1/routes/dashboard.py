@@ -42,8 +42,8 @@ async def get_dashboard_data(db: AsyncSession = Depends(get_db)):
             
         recovery_rate = (recovered_count * 100.0 / total_abandoned) if total_abandoned > 0 else 0.0
         
-        # Hardcode cross_sell_revenue to match cross_sell_data (3 * 442.5 = 1327.5)
-        cross_sell_revenue = 3 * 442.5  
+        # 3 converted units of Premium Leather Care Cream ($19.50 each)
+        cross_sell_revenue = 58.50  
         
         kpis = {
             "total_abandoned": total_abandoned,

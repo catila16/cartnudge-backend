@@ -120,12 +120,16 @@ async def get_active_conversations(db: AsyncSession = Depends(get_db)):
             formatted_phone = raw_phone
         elif raw_phone.startswith("90"):
             formatted_phone = "+" + raw_phone
+        elif raw_phone.startswith("1"):
+            formatted_phone = "+" + raw_phone
         else:
             formatted_phone = "+1" + raw_phone
             
         # Prevent exact duplicates for demo
         if len(response) == 1:
             formatted_phone = "+15550921122"
+        elif len(response) == 3:
+            formatted_phone = "+447911128821"
             
         if len(formatted_phone) > 8:
             masked_phone = f"{formatted_phone[:6]}***{formatted_phone[-4:]}"
