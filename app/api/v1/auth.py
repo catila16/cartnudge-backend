@@ -50,6 +50,9 @@ async def install(request: Request, shop: str, db: AsyncSession = Depends(get_db
 
     # 3. Build the OAuth Authorization URL
     base_url = str(request.base_url).rstrip("/")
+    if base_url.startswith("http://") and "localhost" not in base_url:
+        base_url = base_url.replace("http://", "https://")
+        
     redirect_uri = f"{base_url}/api/v1/auth/callback"
     auth_url = f"https://{shop}/admin/oauth/authorize?client_id={SHOPIFY_API_KEY}&scope={SCOPES}&redirect_uri={redirect_uri}&state={nonce}&grant_options[]=per-user"
     

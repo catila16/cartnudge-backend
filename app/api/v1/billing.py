@@ -33,6 +33,9 @@ async def subscribe(request: Request, shop: str, db: AsyncSession = Depends(get_
 
     # Build dynamic callback URL using the current tunnel's host
     base_url = str(request.base_url).rstrip("/")
+    if base_url.startswith("http://") and "localhost" not in base_url:
+        base_url = base_url.replace("http://", "https://")
+        
     return_url = f"{base_url}/api/v1/billing/callback?shop={shop}"
 
     confirmation_url = await billing_service.create_app_subscription(return_url=return_url)
