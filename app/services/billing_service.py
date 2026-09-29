@@ -56,17 +56,20 @@ class BillingService:
         }
         """
         
+        # Determine test mode dynamically based on environment
+        is_test_mode = os.getenv("SHOPIFY_BILLING_TEST", "true").lower() == "true"
+        
         # We set a Capped Amount of $1000 for the usage charge
         variables = {
             "name": "CartNudge AI Recovery (Commission Based)",
             "returnUrl": return_url,
             "trialDays": 7,
-            "test": True,
+            "test": is_test_mode,
             "lineItems": [
                 {
                     "plan": {
                         "appUsagePricingDetails": {
-                            "terms": "12% for AI recovered carts, 4% for Human taken-over carts.",
+                            "terms": "12% for AI recovered carts, 8% for Human taken-over carts.",
                             "cappedAmount": {
                                 "amount": 1000.0,
                                 "currencyCode": "USD"

@@ -48,7 +48,7 @@ class StoreSettings(Base):
     @property
     def assisted_commission_rate(self):
         from decimal import Decimal
-        return Decimal("4.00")
+        return Decimal("8.00")
         
     @property
     def min_fee_guard(self):

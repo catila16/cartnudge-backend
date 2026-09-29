@@ -147,7 +147,7 @@ async def shopify_order_create(
     # Determine Commission Rate
     rate = 0
     if conversation.conversion_type == "ASSISTED":
-        rate = store.assisted_commission_rate # 4%
+        rate = store.assisted_commission_rate # 8%
     elif conversation.status.value in ["SUCCESS", "NEGOTIATION"]:
         # AI recovered
         rate = store.bot_commission_rate # 12%
