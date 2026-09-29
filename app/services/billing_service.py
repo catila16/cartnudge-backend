@@ -61,7 +61,7 @@ class BillingService:
         
         # We set a Capped Amount of $1000 for the usage charge
         variables = {
-            "name": "CartNudge AI Recovery (Commission Based)",
+            "name": "CartNudge AI Recovery (Usage Plan)",
             "returnUrl": return_url,
             "trialDays": 7,
             "test": is_test_mode,
