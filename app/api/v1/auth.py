@@ -25,7 +25,7 @@ SCOPES = "read_checkouts,read_orders,write_orders,read_products,read_customers"
 APP_URL = os.getenv("APP_URL", "https://slick-times-eat.loca.lt")
 
 @router.get("/install")
-async def install(shop: str, db: AsyncSession = Depends(get_db)):
+async def install(request: Request, shop: str, db: AsyncSession = Depends(get_db)):
     """
     Initiates the OAuth flow.
     Generates a nonce (state) for CSRF protection and redirects the user to the Shopify OAuth screen.
@@ -49,9 +49,8 @@ async def install(shop: str, db: AsyncSession = Depends(get_db)):
     await db.commit()
 
     # 3. Build the OAuth Authorization URL
-    # By passing `grant_options[]=per-user`, we request an online (expiring) access token.
-    # Shopify no longer allows non-expiring offline tokens for new apps without Token Exchange.
-    redirect_uri = f"{APP_URL}/api/v1/auth/callback"
+    base_url = str(request.base_url).rstrip("/")
+    redirect_uri = f"{base_url}/api/v1/auth/callback"
     auth_url = f"https://{shop}/admin/oauth/authorize?client_id={SHOPIFY_API_KEY}&scope={SCOPES}&redirect_uri={redirect_uri}&state={nonce}&grant_options[]=per-user"
     
     # We use window.top.location.href because if the user clicks the install link from INSIDE an iframe (e.g. they clicked an app link), we need to break out to the full window.
